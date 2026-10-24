@@ -125,3 +125,7 @@ memo. Both are on by default.
 - Unverified: that `x-amzn-upx-token` is the page's `__NEXT_DATA__` token;
   digital (`D01-`) order pages; that MX accepts `PUT` of the transaction object
   as listed (the widget adds a few display-only fields).
+
+## License
+
+[AGPL-3.0-or-later](LICENSE). Copyright 2026 Zaq Question.

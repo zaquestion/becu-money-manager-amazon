@@ -2,6 +2,7 @@
   "name": "becu-money-manager-amazon",
   "description": "Split and categorize Amazon charges in BECU Money Manager (MX) using your Amazon order details",
   "private": true,
+  "license": "AGPL-3.0-or-later",
   "homepage": "https://github.com/zaquestion/becu-money-manager-amazon",
   "repository": {
     "type": "git",

@@ -95,7 +95,7 @@ recategorize it. Unofficial; not affiliated with BECU, MX or Amazon.
 
 **Homepage:** https://github.com/zaquestion/becu-money-manager-amazon
 
-**License:** pick one in the form (the repo has no LICENSE file yet).
+**License:** GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later), as in `LICENSE`.
 
 **Privacy policy:** paste the [Privacy](#privacy) section below.
 
