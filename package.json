@@ -1,0 +1,22 @@
+{
+  "name": "becu-mx-amazon",
+  "description": "Split and categorize Amazon charges in BECU Money Manager (MX) using your Amazon order details",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "compile": "tsc --noEmit",
+    "test": "vitest run",
+    "postinstall": "wxt prepare"
+  },
+  "devDependencies": {
+    "happy-dom": "21.0.4",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5",
+    "wxt": "0.21.4"
+  },
+  "packageManager": "pnpm@12.15.0"
+}
