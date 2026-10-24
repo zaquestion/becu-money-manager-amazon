@@ -151,9 +151,11 @@ async function loadMatchedOrders(fresh = false, first: string[] = []) {
   if (state.amazon?.status !== 'ready') return;
   const { parents } = mxCharges();
   const matches = matchCharges(parents, state.amazon.value);
-  // Orders for the drawer first, then ones that can still be categorized.
-  const rank = (m: MxCharge) => (first.includes(m.guid) ? 0 : m.hasBeenSplit ? 2 : 1);
-  const ordered = [...parents].sort((a, b) => rank(a) - rank(b));
+  // Already split or recategorized ones don't show their items, so skip
+  // them; orders for the drawer go first.
+  const ordered = parents
+    .filter((m) => !m.hasBeenSplit && !store.applied[m.guid])
+    .sort((a, b) => Number(!first.includes(a.guid)) - Number(!first.includes(b.guid)));
   for (const m of ordered) {
     const charge = matches.get(m.guid);
     if (!charge || charge.kind === 'refund') continue;
@@ -224,8 +226,8 @@ function apply(m: MxCharge, plan: Plan) {
   });
 }
 
-function undo(m: MxCharge) {
-  return run(m.guid, async () => {
+async function undo(m: MxCharge) {
+  await run(m.guid, async () => {
     const applied = store.applied[m.guid];
     if (m.hasBeenSplit) {
       await callMain({ op: 'unsplit', guid: m.guid });
@@ -240,6 +242,8 @@ function undo(m: MxCharge) {
     await saveStore('applied');
     return { tone: 'ok', text: `Undone. ${RELOAD_HINT}` };
   });
+  // Its items show again, so its order is needed again.
+  loadMatchedOrders(false, [m.guid]);
 }
 
 // ---------------------------------------------------------------------------

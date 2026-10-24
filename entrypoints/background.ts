@@ -11,7 +11,9 @@ const HELPER_URL = 'https://www.amazon.com/cpe/yourpayments/transactions';
 const READY_TIMEOUT_MS = 45_000;
 const HELPER_IDLE_MS = 90_000;
 const CHARGES_TTL_MS = 10 * 60_000;
-const ORDER_TTL_MS = 12 * 60 * 60_000;
+// Long enough to cover a couple of weekly categorizing sessions; older
+// orders are deleted, not just refetched.
+const ORDER_TTL_MS = 14 * 24 * 60 * 60_000;
 
 let helperTab: number | undefined; // a tab we opened ourselves
 let helperTimer: ReturnType<typeof setTimeout> | undefined;
@@ -97,7 +99,17 @@ async function getOrder(id: string, fresh?: boolean): Promise<AmazonResult<Order
   return result;
 }
 
+async function purgeOrders() {
+  const all = await browser.storage.local.get(null);
+  const fresh = (value: unknown) => Date.now() - ((value as { at?: number })?.at ?? 0) < ORDER_TTL_MS;
+  const expired = Object.keys(all).filter((key) => key.startsWith('order:') && !fresh(all[key]));
+  if (expired.length) await browser.storage.local.remove(expired);
+}
+
 export default defineBackground(() => {
+  // Runs each time the worker starts, which it does whenever it's needed.
+  purgeOrders().catch(() => {});
+
   browser.runtime.onMessage.addListener((message, sender, reply) => {
     if (message?.type === AMAZON_READY) {
       if (sender.tab?.id !== undefined) readyWaiters.get(sender.tab.id)?.();

@@ -74,7 +74,9 @@ memo. Both are on by default.
     with `exclusiveStartKey` (what the page's infinite scroll calls).
   - Order details come from `/gp/css/summary/edit.html?orderID=…`, read via
     its `data-component` attributes.
-  - Orders are cached in extension storage for 12h, charges for 10 min.
+  - Orders are cached in extension storage for 14 days (then deleted), charges
+    for 10 min. Orders aren't fetched for charges already split or
+    recategorized.
 - **Money Manager side**: a MAIN-world script wraps fetch/XHR to reuse the
   widget's `md-session-token` and collect categories and Amazon transactions
   (as in `becu_import`). The panel runs in the ISOLATED world and talks to it
