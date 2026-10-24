@@ -5,7 +5,12 @@ behind each Amazon charge in BECU Money Manager (MX's widget at
 `widgets.moneydesktop.com`), and splits or recategorizes the charge by item.
 Companion to `becu_import`.
 
+Unofficial; not affiliated with BECU, MX or Amazon.
+
 ## Build & load
+
+Needs Node and [pnpm](https://pnpm.io) (the version is pinned in
+`package.json`'s `packageManager`; `corepack enable` picks it up).
 
 ```sh
 pnpm install
@@ -13,21 +18,49 @@ pnpm build          # or `pnpm dev` for live reload
 pnpm test
 ```
 
+Tests that read saved Amazon/MX pages skip unless those pages are in
+`samples/` (git-ignored, since real pages contain personal data).
+
 Open `chrome://extensions`, enable Developer mode, click **Load unpacked** and
 pick `.output/chrome-mv3`.
+
+## Release
+
+Publish a GitHub release with a tag like `v0.2.0`. The `Release` workflow sets
+the extension version from the tag, runs the type check and tests, attaches the
+zip to the release and submits it to the Chrome Web Store, where it goes live
+after review. The version must be higher than the one currently in the store.
+
+The workflow uses the Chrome Web Store API v2 with a service account. One-time
+setup:
+
+1. In Google Cloud, enable the Chrome Web Store API, create a service account
+   (no roles needed) and create a JSON key for it.
+2. In the Chrome Web Store Developer Dashboard, add the service account's email
+   under **Account**.
+3. Add these repository secrets (the extension and publisher IDs are set in
+   the workflow):
+   - `CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL` (`client_email` from the key)
+   - `CHROME_SERVICE_ACCOUNT_PRIVATE_KEY` (`private_key` from the key, pasted as
+     the multi-line PEM, not with literal `\n`)
 
 ## Use
 
 1. Be signed in to amazon.com in the same browser profile.
 2. In Money Manager, open Transactions and click **Amazon items** (next to
-   Export CSV, or bottom-right if it can't be placed there).
+   Export CSV), or open an Amazon charge and click **Update With Item
+   Details** in its Transaction Details drawer.
 3. Each Amazon charge in view is matched to your Amazon payments and shows the
-   order's items. Pick a category per item, then **Split into N categories**
-   (or **Set category to …** when all items share one) and confirm.
+   order's items. Pick a category per item, then **Split into N items** (or
+   **Set category to …** for a single-item order) and confirm. Multi-item
+   charges get one part per item, even when items share a category.
 4. Reload Money Manager to see the change in its list. **Undo** / **Unsplit**
    reverses it.
 
 Categories you pick are remembered per product (ASIN) and suggested next time.
+With **Item in payee** on, single-item charges and split parts get the payee
+`Amazon - <item>`; with **Item names in memo** on, full item names go in the
+memo. Both are on by default.
 
 ## How it works
 

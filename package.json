@@ -1,7 +1,13 @@
 {
-  "name": "becu-mx-amazon",
+  "name": "becu-money-manager-amazon",
   "description": "Split and categorize Amazon charges in BECU Money Manager (MX) using your Amazon order details",
   "private": true,
+  "homepage": "https://github.com/zaquestion/becu-money-manager-amazon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zaquestion/becu-money-manager-amazon.git"
+  },
+  "bugs": "https://github.com/zaquestion/becu-money-manager-amazon/issues",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
