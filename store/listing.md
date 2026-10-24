@@ -1,11 +1,10 @@
 # Chrome Web Store listing
 
 Copy-paste text for the Developer Dashboard. Upload `.output/becu-money-manager-amazon-<version>-chrome.zip`
-(built with `pnpm zip`). Store icon: `store/icon-128.png` (a copy of `public/icon/128.png`).
-Screenshots (1280×800), still to take: `store/screenshot-1-panel.png` (the Amazon items panel),
-`store/screenshot-2-drawer.png` (Update With Item Details in the Transaction Details drawer),
-`store/screenshot-3-split.png` (a split confirmed). Use a demo account, or blur order numbers,
-amounts and card digits. Extension ID: `fcekbhgbigdcbkjnahehajmdgnnljijj`
+(built with `pnpm zip`). Store icon: `store/icon-128.png`. Screenshots (1280×800):
+`store/screenshot-1-toolbar.png`, `store/screenshot-2-panel.png`, `store/screenshot-3-drawer.png`,
+`store/screenshot-4-items.png` (order numbers, statement codes and other charges blurred).
+Icons come from `scripts/make-icons.py`. Extension ID: `fcekbhgbigdcbkjnahehajmdgnnljijj`
 (https://chromewebstore.google.com/detail/fcekbhgbigdcbkjnahehajmdgnnljijj).
 
 ## Name
