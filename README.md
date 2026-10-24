@@ -1,9 +1,12 @@
 # Amazon Orders for BECU Money Manager
 
-Chromium extension (TypeScript + [WXT](https://wxt.dev)) that shows the items
-behind each Amazon charge in BECU Money Manager (MX's widget at
+Chrome and Firefox extension (TypeScript + [WXT](https://wxt.dev)) that shows
+the items behind each Amazon charge in BECU Money Manager (MX's widget at
 `widgets.moneydesktop.com`), and splits or recategorizes the charge by item.
 Companion to `becu_import`.
+
+Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/fcekbhgbigdcbkjnahehajmdgnnljijj)
+or [Firefox Add-ons](https://addons.mozilla.org/firefox/addon/becu-money-manager-amazon/).
 
 Unofficial; not affiliated with BECU, MX or Amazon.
 
@@ -24,12 +27,19 @@ Tests that read saved Amazon/MX pages skip unless those pages are in
 Open `chrome://extensions`, enable Developer mode, click **Load unpacked** and
 pick `.output/chrome-mv3`.
 
+For Firefox (140 or later), use `pnpm build:firefox` (or `pnpm dev:firefox`),
+then open `about:debugging#/runtime/this-firefox`, click **Load Temporary
+Add-on…** and pick `.output/firefox-mv3/manifest.json`.
+
 ## Release
 
 Publish a GitHub release with a tag like `v0.2.0`. The `Release` workflow sets
 the extension version from the tag, runs the type check and tests, attaches the
-zip to the release and submits it to the Chrome Web Store, where it goes live
-after review. The version must be higher than the one currently in the store.
+Chrome, Firefox and sources zips to the release and submits them to the Chrome
+Web Store and Firefox Add-ons (AMO), where they go live after review. The
+version must be higher than the one currently in each store.
+
+### Chrome Web Store
 
 The workflow uses the Chrome Web Store API v2 with a service account. One-time
 setup:
@@ -43,6 +53,21 @@ setup:
    - `CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL` (`client_email` from the key)
    - `CHROME_SERVICE_ACCOUNT_PRIVATE_KEY` (`private_key` from the key, pasted as
      the multi-line PEM, not with literal `\n`)
+
+### Firefox Add-ons
+
+AMO reviews the built code against the sources zip (`pnpm zip:firefox` writes
+both; `samples/`, `store/` and the raw captures are left out). The add-on ID
+`becu-money-manager-amazon@zaquestion.github.io` is set in `wxt.config.ts`.
+One-time setup:
+
+1. Submit the first version by hand at
+   <https://addons.mozilla.org/developers/addon/submit/> (the API can only add
+   versions to an existing add-on): upload the Firefox zip, then the sources
+   zip, and fill in the listing from `store/listing.md`.
+2. Create API credentials at
+   <https://addons.mozilla.org/developers/addon/api/key/> and add them as
+   repository secrets `FIREFOX_JWT_ISSUER` and `FIREFOX_JWT_SECRET`.
 
 ## Use
 

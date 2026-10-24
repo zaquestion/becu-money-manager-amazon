@@ -1,7 +1,8 @@
 name: Release
 
 # Publishing a GitHub release tagged vX.Y.Z builds the extension at version
-# X.Y.Z, attaches the zip to the release and submits it to the Chrome Web Store.
+# X.Y.Z, attaches the zips to the release and submits them to the Chrome Web
+# Store and Firefox Add-ons (AMO).
 on:
   release:
     types: [published]
@@ -41,11 +42,14 @@ jobs:
 
       - run: pnpm zip
 
-      - name: Attach zip to release
+      # Also writes the sources zip AMO asks for, since the code is bundled.
+      - run: pnpm zip:firefox
+
+      - name: Attach zips to release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" .output/*-chrome.zip --clobber
+        run: gh release upload "$TAG" .output/*-chrome.zip .output/*-firefox.zip .output/*-sources.zip --clobber
 
       - name: Submit to Chrome Web Store
         run: pnpm wxt submit --chrome-zip .output/*-chrome.zip
@@ -55,3 +59,10 @@ jobs:
           CHROME_PUBLISHER_ID: 10579842-4e58-4df2-811f-6496b3a860cb
           CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL }}
           CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CHROME_SERVICE_ACCOUNT_PRIVATE_KEY }}
+
+      - name: Submit to Firefox Add-ons
+        run: pnpm wxt submit --firefox-zip .output/*-firefox.zip --firefox-sources-zip .output/*-sources.zip
+        env:
+          FIREFOX_EXTENSION_ID: becu-money-manager-amazon@zaquestion.github.io
+          FIREFOX_JWT_ISSUER: ${{ secrets.FIREFOX_JWT_ISSUER }}
+          FIREFOX_JWT_SECRET: ${{ secrets.FIREFOX_JWT_SECRET }}

@@ -1,6 +1,7 @@
-# Chrome Web Store listing
+# Store listings
 
-Copy-paste text for the Developer Dashboard. Upload `.output/becu-money-manager-amazon-<version>-chrome.zip`
+Copy-paste text for the Chrome Web Store Developer Dashboard and, where noted under
+[Firefox Add-ons (AMO)](#firefox-add-ons-amo), the AMO Developer Hub. Chrome: Upload `.output/becu-money-manager-amazon-<version>-chrome.zip`
 (built with `pnpm zip`). Store icon: `store/icon-128.png`. Screenshots (1280×800):
 `store/screenshot-1-toolbar.png`, `store/screenshot-2-panel.png`, `store/screenshot-3-drawer.png`,
 `store/screenshot-4-items.png` (order numbers, statement codes and other charges blurred).
@@ -72,6 +73,52 @@ Certify all three:
 - I do not use or transfer user data to determine creditworthiness or for lending purposes
 
 Writing the item categories, names and split amounts back to the user's own Money Manager transaction is the item's single purpose, done only when the user confirms a split or category change.
+
+## Firefox Add-ons (AMO)
+
+Upload `.output/becu-money-manager-amazon-<version>-firefox.zip`, then
+`.output/becu-money-manager-amazon-<version>-sources.zip` when asked for source code (both from
+`pnpm zip:firefox`). Add-on ID: `becu-money-manager-amazon@zaquestion.github.io`
+(https://addons.mozilla.org/firefox/addon/becu-money-manager-amazon/). Requires Firefox 140+.
+Reuse the name, the detailed description, the icon and the screenshots from above; AMO shows
+screenshots at any size, so the 1280×800 ones work as they are.
+
+**Summary (max 250 chars):** Split Amazon charges in BECU Money Manager by item using your Amazon
+order details: see the items behind each charge, pick a category per item, and split or
+recategorize it. Unofficial; not affiliated with BECU, MX or Amazon.
+
+**Categories:** Shopping; Other
+
+**Tags:** amazon, budget, finance, money manager, bank
+
+**Support site:** https://github.com/zaquestion/becu-money-manager-amazon/issues
+
+**Homepage:** https://github.com/zaquestion/becu-money-manager-amazon
+
+**License:** pick one in the form (the repo has no LICENSE file yet).
+
+**Privacy policy:** paste the [Privacy](#privacy) section below.
+
+**Data collection (from the manifest):** Financial and payment information, required. Item names
+and amounts from the user's Amazon orders are written to their own Money Manager transactions when
+they confirm a split or category change. Nothing is sent to the developer.
+
+**Notes to reviewer:**
+
+> Built with WXT (Vite). To reproduce the uploaded zip from the sources zip: Node 22 and pnpm
+> 12.15.0 (pinned in package.json `packageManager`; `corepack enable` selects it), then
+> `pnpm install --frozen-lockfile && pnpm zip:firefox`. The build is in `.output/firefox-mv3/`
+> and the zip in `.output/`. No remote code; everything is bundled.
+>
+> Testing needs a BECU online banking account (Money Manager runs at widgets.moneydesktop.com
+> inside it) and an amazon.com account with recent orders, so it can't be tried without one.
+> What it does: the amazon.com content script fetches the user's own Your Payments and order
+> details pages (same-origin, read-only) when Money Manager asks for them, through the background
+> script, which opens a background amazon.com tab if none is open and closes it after 90s idle.
+> The MAIN-world script on widgets.moneydesktop.com wraps fetch/XHR to reuse the widget's session
+> headers and read the transactions and categories it loads; it only sends the widget's own API
+> requests (recategorize, split, unsplit) after the user confirms in the extension's UI. Amazon
+> data stays in the isolated-world script and is never handed to the page.
 
 ## Privacy policy URL
 

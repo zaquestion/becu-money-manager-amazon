@@ -43,6 +43,11 @@ function scheduleHelperClose() {
 }
 
 async function sendToAmazon<T>(message: AmazonRequest): Promise<AmazonResult<T>> {
+  // Firefox lets users turn off site access; without it the content script
+  // never loads and we'd only time out.
+  if (!(await browser.permissions.contains({ origins: ['https://www.amazon.com/*'] }))) {
+    return { ok: false, error: "The extension isn't allowed to access amazon.com. Allow it in the extension's permissions, then click Refresh." };
+  }
   const tabs = await browser.tabs.query({ url: 'https://www.amazon.com/*', status: 'complete' });
   // Prefer an Amazon tab the user already has open.
   for (const tab of tabs.sort((a, b) => Number(a.id === helperTab) - Number(b.id === helperTab))) {
