@@ -100,6 +100,9 @@ export interface Part {
   categoryGuid: string;
   cents: number;
   titles: string[];
+  // Instead of the ones made from `titles`.
+  payee?: string;
+  memo?: string;
 }
 
 export interface Plan {
@@ -113,6 +116,8 @@ export interface Plan {
   // The orders' total differs from this charge (several charges for one
   // order, or part paid with points/gift card), so shares are proportional.
   approximate: boolean;
+  // Remember the category under this key rather than per item.
+  ruleKey?: string;
 }
 
 // Shares the whole charge across items by price, which spreads tax,
@@ -133,7 +138,13 @@ export function buildPlan(
     cents: shares[i]!,
     categoryGuid: categoryFor(item, i),
   }));
-  const parts = items.map((p) => ({ categoryGuid: p.categoryGuid, cents: p.cents, titles: [p.item.title] }));
+  const store = orders.every((o) => o.store === orders[0]?.store) ? orders[0]?.store : undefined;
+  const parts = items.map((p) => ({
+    categoryGuid: p.categoryGuid,
+    cents: p.cents,
+    titles: [p.item.title],
+    payee: store && payeeFor([p.item.title], `${store} - `),
+  }));
   const byCategory: Part[] = [];
   for (const p of items) {
     let total = byCategory.find((x) => x.categoryGuid === p.categoryGuid);
@@ -142,7 +153,31 @@ export function buildPlan(
     total.titles.push(p.item.title);
   }
   const orderTotal = orders.reduce((s, o) => s + (o.totalCents ?? NaN), 0);
-  return { items, parts, byCategory, approximate: !(orderTotal === chargeCents) };
+  // Grocery orders charge the tip separately.
+  const tips = orders.reduce((s, o) => s + (o.tipCents ?? 0), 0);
+  return { items, parts, byCategory, approximate: !(orderTotal === chargeCents || orderTotal - tips === chargeCents) };
+}
+
+// The separate charge for a grocery order's tip.
+export function isTip(chargeCents: number, orders: Order[]): boolean {
+  const order = orders.length === 1 ? orders[0]! : undefined;
+  return !!order?.tipCents && order.tipCents === chargeCents && order.totalCents !== chargeCents;
+}
+
+export const storeRuleKey = (store: string, tip: boolean) => `${tip ? 'tip' : 'store'}:${store.toLowerCase()}`;
+
+// A store's grocery charge (or its tip) as one part under the store's name,
+// for when the items aren't wanted one by one.
+export function storePlan(chargeCents: number, order: Order & { store: string }, categoryGuid: string): Plan {
+  const tip = isTip(chargeCents, [order]);
+  const part: Part = {
+    categoryGuid,
+    cents: chargeCents,
+    titles: tip ? [] : order.items.map((i) => i.title),
+    payee: order.store,
+    memo: tip ? 'Tip' : undefined,
+  };
+  return { items: [], parts: [part], byCategory: [part], approximate: false, ruleKey: storeRuleKey(order.store, tip) };
 }
 
 const MEMO_LIMIT = 250;
@@ -162,16 +197,16 @@ export const PAYEE_PREFIX = 'Amazon - ';
 // with several items the payee is left alone. Amazon titles are long and
 // keyword-stuffed, so keep the part before the first separator when it
 // still says something.
-export function payeeFor(titles: string[]): string | undefined {
+export function payeeFor(titles: string[], prefix = PAYEE_PREFIX): string | undefined {
   if (titles.length !== 1) return undefined;
   let name = titles[0]!.replace(/\s+/g, ' ').trim();
   const cut = /,| \| | - | – | — /.exec(name);
   if (cut && cut.index >= 15) name = name.slice(0, cut.index);
-  const room = PAYEE_LIMIT - PAYEE_PREFIX.length;
+  const room = PAYEE_LIMIT - prefix.length;
   if (name.length > room) {
     const words = name.slice(0, room - 1);
     const space = words.lastIndexOf(' ');
     name = `${(space > room / 2 ? words.slice(0, space) : words).trimEnd()}…`;
   }
-  return PAYEE_PREFIX + name;
+  return prefix + name;
 }

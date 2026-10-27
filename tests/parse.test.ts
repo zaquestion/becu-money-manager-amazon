@@ -4,7 +4,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseCents, parseDate, parseOrderPage, parsePaymentsPage, parseTransactionsResponse } from '@/lib/amazon/parse';
+import {
+  isGroceryOrderPage,
+  parseCents,
+  parseDate,
+  parseGroceryOrderPage,
+  parseOrderPage,
+  parsePaymentsPage,
+  parseTransactionsResponse,
+} from '@/lib/amazon/parse';
 
 // (happy-dom replaces URL, so build paths with node:path.)
 const local = (path: string) => join(import.meta.dirname, '..', path);
@@ -55,5 +63,27 @@ describe.each(['Order Details (1 item).html', 'Order Details (multi item).html']
     const items = order.items.reduce((s, i) => s + i.unitCents * i.quantity, 0);
     expect(items).toBe(order.subtotalCents);
     expect(order.totalCents).toBeGreaterThan(0);
+  });
+});
+
+describe.skipIf(!has('Order Details (wholefoods).html'))('grocery order page', () => {
+  it('items add up to the subtotal, and the summary (with tip) to the total', () => {
+    const page = doc('Order Details (wholefoods).html');
+    expect(isGroceryOrderPage(page)).toBe(true);
+    expect(isGroceryOrderPage(doc('Order Details (1 item).html'))).toBe(false);
+    const order = parseGroceryOrderPage(page);
+    expect(order.id).toMatch(/^\d{3}-\d{7}-\d{7}$/);
+    expect(order.date).toMatch(/^\d{4}-\d\d-\d\d$/);
+    expect(order.store).toBe('Whole Foods');
+    expect(order.items.length).toBeGreaterThan(1);
+    for (const item of order.items) {
+      expect(item.title.length).toBeGreaterThan(3);
+      expect(item.asin).toMatch(/^[A-Z0-9]{10}$/);
+    }
+    expect(order.items.reduce((s, i) => s + i.unitCents * i.quantity, 0)).toBe(order.subtotalCents);
+    expect(order.tipCents).toBeGreaterThan(0);
+    // A waived fee counts as what was charged, not the struck-out price.
+    const charged = order.summary.filter((s) => !/^(grand total|total before tax)/i.test(s.label)).reduce((s, x) => s + x.cents, 0);
+    expect(charged).toBe(order.totalCents);
   });
 });

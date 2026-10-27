@@ -38,7 +38,9 @@ export interface Order {
   items: OrderItem[];
   summary: { label: string; cents: number }[];
   subtotalCents?: number;
-  totalCents?: number;
+  totalCents?: number; // includes the tip, which Amazon charges separately
+  tipCents?: number;
+  store?: string; // grocery orders: "Whole Foods" or "Amazon Fresh"
 }
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
@@ -166,5 +168,47 @@ export function parseOrderPage(doc: Document): Order {
     summary,
     subtotalCents: find(/^item\(s\) subtotal/i),
     totalCents: find(/^grand total/i),
+  };
+}
+
+// Grocery delivery/pickup orders (/uff/your-account/order-details?orderID=...),
+// where Amazon sends them instead of the usual order page.
+export const isGroceryOrderPage = (doc: Document) => !!doc.querySelector('#order-summary .ufpo-charge-breakdown');
+
+export function parseGroceryOrderPage(doc: Document): Order {
+  const head = doc.querySelector('#order-summary');
+  const id = /[A-Z0-9]{3}-\d{7}-\d{7}/.exec(text(head))?.[0];
+  if (!id) throw new Error('Not a grocery order page (signed out, or the page changed)');
+
+  const summary: Order['summary'] = [];
+  for (const row of doc.querySelectorAll('.ufpo-charge-breakdown .a-row')) {
+    const label = text(row.querySelector('dt')).replace(/:$/, '');
+    // A waived fee shows the struck-out price first, then what was charged.
+    const cents = parseCents(text([...(row.querySelector('dd')?.querySelectorAll('span') ?? [])].at(-1)));
+    if (label && cents !== undefined) summary.push({ label, cents });
+  }
+  const find = (re: RegExp) => summary.find((s) => re.test(s.label))?.cents;
+
+  const items: OrderItem[] = [];
+  for (const row of doc.querySelectorAll('[id$="-item-grid-row"]')) {
+    const asin = /^([A-Z0-9]{10})-item-grid-row$/.exec(row.id)?.[1];
+    const title = text(row.querySelector('a[href*="/product/"], a[href*="/dp/"]')) || row.querySelector('img')?.getAttribute('alt') || '';
+    const lineCents = parseCents(text(row.querySelector('[id$="-item-total-price"]')));
+    if (!title || lineCents === undefined) continue;
+    // The price is for the line; items sold by weight have no whole count.
+    const qty = Number(text(row.querySelector('.a-span1.a-text-center')));
+    const whole = Number.isInteger(qty) && qty > 0 && lineCents % qty === 0;
+    items.push({ title, asin, unitCents: whole ? lineCents / qty : lineCents, quantity: whole ? qty : 1, shipment: 0 });
+  }
+
+  return {
+    id,
+    date: parseDate(text(head)),
+    items,
+    summary,
+    subtotalCents: find(/^item\(s\) subtotal/i),
+    totalCents: find(/^grand total/i),
+    tipCents: find(/tip$/i),
+    store: /Whole Foods/i.test(text(doc.querySelector('#ufpo-order-status-container'))) ? 'Whole Foods' : 'Amazon Fresh',
   };
 }

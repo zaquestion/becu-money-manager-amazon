@@ -1,7 +1,13 @@
 // Runs in the amazon.com content script, so these are same-origin requests
 // made with the user's own Amazon session.
 import type { AmazonCharge, Order } from './parse';
-import { parseOrderPage, parsePaymentsPage, parseTransactionsResponse } from './parse';
+import {
+  isGroceryOrderPage,
+  parseGroceryOrderPage,
+  parseOrderPage,
+  parsePaymentsPage,
+  parseTransactionsResponse,
+} from './parse';
 
 const PAYMENTS_URL = '/cpe/yourpayments/transactions';
 const TRANSACTIONS_API = '/payments-portal/data/iris/live/v1/data/manage/get-transactions';
@@ -71,7 +77,9 @@ export async function fetchCharges(since: string): Promise<AmazonCharge[]> {
 export async function fetchOrder(id: string): Promise<Order> {
   // Amazon Pay purchases at other stores; their details live on payments.amazon.com.
   if (id.startsWith('P01-')) throw new Error('Amazon Pay orders from other stores are not supported');
-  const order = parseOrderPage(await getDocument(`/gp/css/summary/edit.html?orderID=${encodeURIComponent(id)}`));
+  // Grocery (Whole Foods, Fresh) orders redirect to their own page.
+  const doc = await getDocument(`/gp/css/summary/edit.html?orderID=${encodeURIComponent(id)}`);
+  const order = isGroceryOrderPage(doc) ? parseGroceryOrderPage(doc) : parseOrderPage(doc);
   if (order.id !== id) throw new Error(`Asked for order ${id} but got ${order.id}`);
   return order;
 }

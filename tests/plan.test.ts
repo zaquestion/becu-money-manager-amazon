@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import type { AmazonCharge, Order } from '@/lib/amazon/parse';
 import type { MxCharge } from '@/lib/plan';
-import { CREDIT, DEBIT, PAYEE_LIMIT, allocate, buildPlan, matchCharges, memoFor, payeeFor, toMxCharge } from '@/lib/plan';
+import {
+  CREDIT,
+  DEBIT,
+  PAYEE_LIMIT,
+  allocate,
+  buildPlan,
+  isTip,
+  matchCharges,
+  memoFor,
+  payeeFor,
+  storePlan,
+  toMxCharge,
+} from '@/lib/plan';
 
 const mx = (guid: string, cents: number, date: string, type = DEBIT): MxCharge => ({
   guid, cents, date, type, categoryGuid: 'CAT-shopping', memo: null, hasBeenSplit: false, parentGuid: null, pending: false, raw: { guid },
@@ -76,6 +88,44 @@ describe('buildPlan', () => {
   it('weights by quantity', () => {
     const o: Order = { ...order, items: [item('A', 500, 3), item('B', 500)], totalCents: 2000 };
     expect(buildPlan(2000, [o], (_x, i) => `C${i}`).items.map((p) => p.cents)).toEqual([1500, 500]);
+  });
+});
+
+describe('grocery orders', () => {
+  // Amazon charges the tip on its own; the order page's total includes it.
+  const order: Order & { store: string } = {
+    id: '112-0000000-0000002',
+    items: [item('Hummus', 500), item('Arugula', 479), item('Body butter', 1449)],
+    summary: [],
+    subtotalCents: 2428,
+    totalCents: 3128,
+    tipCents: 500,
+    store: 'Whole Foods',
+  };
+
+  it('tells the tip charge from the order charge', () => {
+    expect(isTip(500, [order])).toBe(true);
+    expect(isTip(2628, [order])).toBe(false);
+    expect(isTip(500, [{ ...order, tipCents: undefined }])).toBe(false);
+  });
+
+  it('gives the whole charge one category under the store name', () => {
+    const plan = storePlan(2628, order, 'CAT-groceries');
+    expect(plan.parts).toEqual([
+      { categoryGuid: 'CAT-groceries', cents: 2628, titles: ['Hummus', 'Arugula', 'Body butter'], payee: 'Whole Foods', memo: undefined },
+    ]);
+    expect(plan.ruleKey).toBe('store:whole foods');
+    expect(storePlan(500, order, 'CAT-tips')).toMatchObject({
+      parts: [{ cents: 500, titles: [], payee: 'Whole Foods', memo: 'Tip' }],
+      ruleKey: 'tip:whole foods',
+    });
+  });
+
+  it('itemizes the charge without the tip exactly, named after the store', () => {
+    const plan = buildPlan(2628, [order], () => 'CAT-groceries');
+    expect(plan.approximate).toBe(false);
+    expect(plan.parts.reduce((s, p) => s + p.cents, 0)).toBe(2628);
+    expect(plan.parts[0]!.payee).toBe('Whole Foods - Hummus');
   });
 });
 

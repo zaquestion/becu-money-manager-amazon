@@ -16,9 +16,10 @@ interface Stored {
   applied: Record<string, Applied>; // MX transaction guid -> what we did
   writeMemos: boolean;
   writePayees: boolean;
+  itemizeGroceries: boolean; // otherwise a grocery charge gets one category
 }
 
-const DEFAULTS: Stored = { rules: {}, applied: {}, writeMemos: true, writePayees: true };
+const DEFAULTS: Stored = { rules: {}, applied: {}, writeMemos: true, writePayees: true, itemizeGroceries: false };
 
 export const store: Stored = structuredClone(DEFAULTS);
 

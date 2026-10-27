@@ -13,7 +13,18 @@ import type { Inline } from './drawer';
 import { watchDrawer } from './drawer';
 import { INLINE_STYLE, STYLE } from './panel-style';
 import type { MxCharge, Part, Plan } from './plan';
-import { CREDIT, MATCH_WINDOW, buildPlan, matchCharges, memoFor, payeeFor, toMxCharge } from './plan';
+import {
+  CREDIT,
+  MATCH_WINDOW,
+  buildPlan,
+  isTip,
+  matchCharges,
+  memoFor,
+  payeeFor,
+  storePlan,
+  storeRuleKey,
+  toMxCharge,
+} from './plan';
 import { itemKey, loadStore, saveStore, store } from './store';
 import { toolbarButton, watchToolbar } from './toolbar';
 
@@ -108,7 +119,19 @@ function ordersFor(charge: AmazonCharge): Load<Order[]> {
   return { status: 'ready', value: loads.map((l) => (l as { value: Order }).value) };
 }
 
+// A grocery order's charge (unless itemizing) or tip: one category for all of it.
+function groceryOrder(m: MxCharge, orders: Order[]) {
+  const order = orders.length === 1 ? orders[0] : undefined;
+  if (!order?.store || (store.itemizeGroceries && !isTip(m.cents, orders))) return undefined;
+  return order as Order & { store: string };
+}
+
 function planFor(m: MxCharge, orders: Order[]): Plan {
+  const grocery = groceryOrder(m, orders);
+  if (grocery) {
+    const key = storeRuleKey(grocery.store, isTip(m.cents, orders));
+    return storePlan(m.cents, grocery, state.choices.get(`${m.guid}|store`) ?? store.rules[key] ?? m.categoryGuid ?? '');
+  }
   return buildPlan(
     m.cents,
     orders,
@@ -194,8 +217,8 @@ const RELOAD_HINT = 'Reload Money Manager to see it in the transaction list.';
 function changesFor(part: Part) {
   return {
     categoryGuid: part.categoryGuid,
-    memo: store.writeMemos ? memoFor(part.titles) : undefined,
-    description: store.writePayees ? payeeFor(part.titles) : undefined,
+    memo: store.writeMemos ? (part.memo ?? memoFor(part.titles)) : undefined,
+    description: store.writePayees ? (part.payee ?? payeeFor(part.titles)) : undefined,
   };
 }
 
@@ -219,6 +242,7 @@ function apply(m: MxCharge, plan: Plan) {
       store.applied[m.guid] = { kind: 'split', at: Date.now() };
     }
     for (const p of plan.items) store.rules[itemKey(p.item)] = p.categoryGuid;
+    if (plan.ruleKey) store.rules[plan.ruleKey] = plan.parts[0]!.categoryGuid;
     for (const key of [...state.choices.keys()]) if (key.startsWith(`${m.guid}|`)) state.choices.delete(key);
     await saveStore('rules', 'applied');
     const what = plan.parts.length === 1 ? `Set to ${categoryName(plan.parts[0]!.categoryGuid)}.` : `Split into ${plural(plan.parts.length, 'item')}.`;
@@ -322,9 +346,31 @@ function confirmButton(m: MxCharge, label: string, opts: { disabled?: boolean; d
 
 function splitBody(m: MxCharge, charge: AmazonCharge, orders: Order[]): HTMLElement[] {
   const plan = planFor(m, orders);
-  if (!plan.items.length) return [h('p', { className: 'callout warn', textContent: "Couldn't find any items on the order page." })];
+  const grocery = groceryOrder(m, orders);
+  const itemCount = orders.reduce((s, o) => s + o.items.length, 0);
+  if (!itemCount) return [h('p', { className: 'callout warn', textContent: "Couldn't find any items on the order page." })];
 
   const table = h('table');
+  if (grocery) {
+    const tip = isTip(m.cents, orders);
+    const titleCell = h(
+      'td',
+      { className: 'title' },
+      tip ? `${grocery.store} tip` : `${grocery.store} · ${plural(itemCount, 'item')}`,
+      h('span', {
+        className: 'sub',
+        textContent: tip
+          ? 'Charged separately from the order'
+          : `“Itemize groceries” in the Amazon items panel splits it by item${grocery.tipCents ? ` · tip of ${money(grocery.tipCents)} charged separately` : ''}`,
+      }),
+    );
+    const select = categoryPicker(plan.parts[0]!.categoryGuid, `${m.guid}|cat|store`, (guid) => {
+      state.choices.set(`${m.guid}|store`, guid);
+      if (state.confirming === m.guid) state.confirming = undefined;
+      update();
+    });
+    table.append(h('tr', {}, titleCell, h('td', { className: 'num', textContent: money(m.cents) }), h('td', { className: 'cat' }, select)));
+  }
   plan.items.forEach((p, i) => {
     const titleCell = h(
       'td',
@@ -345,7 +391,7 @@ function splitBody(m: MxCharge, charge: AmazonCharge, orders: Order[]): HTMLElem
     table.append(h('tr', {}, titleCell, h('td', { className: 'num', textContent: money(p.cents) }), h('td', { className: 'cat' }, select)));
   });
 
-  const missing = plan.items.some((p) => !p.categoryGuid);
+  const missing = plan.parts.some((p) => !p.categoryGuid);
   const summary = h(
     'div',
     { className: 'summary' },
@@ -439,9 +485,11 @@ function cardParts(m: MxCharge, charge: AmazonCharge | undefined, partCount: num
   }
   body.push(...splitBody(m, charge, orders.value));
   const items = orders.value.flatMap((o) => o.items);
+  const tip = isTip(m.cents, orders.value);
+  const pending = m.pending || charge.status === 'Pending';
   return {
-    pill: m.pending || charge.status === 'Pending' ? pill('Pending', 'warn') : pill(plural(items.length, 'item')),
-    preview: items.map((i) => i.title).join(' · '),
+    pill: pending ? pill('Pending', 'warn') : pill(tip ? 'Tip' : plural(items.length, 'item')),
+    preview: tip ? `${orders.value[0]!.store} tip` : `${orders.value[0]!.store ? `${orders.value[0]!.store}: ` : ''}${items.map((i) => i.title).join(' · ')}`,
     body,
   };
 }
@@ -504,7 +552,7 @@ function statusMessage(parents: MxCharge[], matched: number): Node | string {
 
 function renderBar(parents: MxCharge[], matched: number) {
   const amazon = state.amazon;
-  const option = (key: 'writeMemos' | 'writePayees', label: string, title: string) => {
+  const option = (key: 'writeMemos' | 'writePayees' | 'itemizeGroceries', label: string, title: string) => {
     const box = h('input', { type: 'checkbox', checked: store[key], 'data-key': key });
     box.addEventListener('change', () => {
       store[key] = box.checked;
@@ -517,6 +565,9 @@ function renderBar(parents: MxCharge[], matched: number) {
     h('span', { className: 'message' }, statusMessage(parents, matched)),
     option('writePayees', 'Item in payee', 'Single-item charges and split parts become "Amazon - <item>"'),
     option('writeMemos', 'Item names in memo', 'Full item names go in the memo'),
+    ...([...state.orders.values()].some((o) => o.status === 'ready' && o.value.store)
+      ? [option('itemizeGroceries', 'Itemize groceries', 'Split Whole Foods and Amazon Fresh charges by item instead of one category for the whole charge')]
+      : []),
     h('button', {
       className: 'btn',
       textContent: 'Refresh',

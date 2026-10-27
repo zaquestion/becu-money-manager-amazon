@@ -87,6 +87,14 @@ With **Item in payee** on, single-item charges and split parts get the payee
 `Amazon - <item>`; with **Item names in memo** on, full item names go in the
 memo. Both are on by default.
 
+Whole Foods and Amazon Fresh orders are groceries, often with many items, so
+by default each charge gets one category with the payee `Whole Foods` (or
+`Amazon Fresh`) instead of being split. Amazon charges the driver tip
+separately; that charge is recognized as the tip and gets its own remembered
+category. Tick **Itemize groceries** (shown once a grocery order is loaded) to
+split grocery charges by item like other orders, with payees
+`Whole Foods - <item>`.
+
 ## How it works
 
 - **Amazon side** (`entrypoints/amazon.content.ts`, `lib/amazon/`): runs in an
@@ -98,7 +106,10 @@ memo. Both are on by default.
     `POST /payments-portal/data/iris/live/v1/data/manage/get-transactions`
     with `exclusiveStartKey` (what the page's infinite scroll calls).
   - Order details come from `/gp/css/summary/edit.html?orderID=…`, read via
-    its `data-component` attributes.
+    its `data-component` attributes. Grocery orders land on
+    `/uff/your-account/order-details` instead, read via its `ufpo-*` and
+    `<ASIN>-item-*` ids; its total includes the tip, which is a separate
+    charge.
   - Orders are cached in extension storage for 14 days (then deleted), charges
     for 10 min. Orders aren't fetched for charges already split or
     recategorized.
@@ -122,8 +133,13 @@ memo. Both are on by default.
 - Refunds are matched and linked but not categorized by item yet.
 - Several charges for one order, or orders partly paid with points: shares are
   proportional and flagged as an estimate.
+- Grocery orders: items sold by weight (no saved sample yet) count as one
+  item at their line price; Amazon Fresh pages are assumed to match Whole
+  Foods ones.
 - Unverified: that `x-amzn-upx-token` is the page's `__NEXT_DATA__` token;
-  digital (`D01-`) order pages; that MX accepts `PUT` of the transaction object
+  digital (`D01-`) order pages; that the usual order URL redirects to the grocery page for grocery orders
+  (the `ref` on the page reached from Your Payments suggests so); that MX
+  accepts `PUT` of the transaction object
   as listed (the widget adds a few display-only fields).
 
 ## License
